@@ -101,11 +101,20 @@
 
     const kelasSelect = document.getElementById('kelas');
     const muridSelect = document.getElementById('nama_murid');
+    const form = document.getElementById('penilaianForm');
+    const submitButton = document.getElementById('submitButton');
+    const statusDiv = document.getElementById('status');
+
 
     // 1. Saat halaman dimuat, ambil semua data
     document.addEventListener('DOMContentLoaded', () => {
         fetch(SCRIPT_URL)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 classData = data.classData;
                 const kelasOptions = Object.keys(classData).sort(); // Ambil nama kelas dan urutkan
@@ -122,6 +131,9 @@
             .catch(error => {
                 console.error('Error fetching data:', error);
                 kelasSelect.innerHTML = '<option value="">Gagal memuat data</option>';
+                statusDiv.textContent = 'Gagal mengambil data kelas. Periksa koneksi atau URL Script.';
+                statusDiv.className = 'error';
+                statusDiv.style.display = 'block';
             });
     });
 
@@ -135,7 +147,8 @@
             muridSelect.innerHTML = '<option value="">Pilih Nama Murid...</option>';
             
             const students = classData[selectedClass] || [];
-            students.forEach(student => {
+            // Urutkan nama murid berdasarkan abjad
+            students.sort().forEach(student => {
                 const option = document.createElement('option');
                 option.value = student;
                 option.textContent = student;
@@ -147,10 +160,45 @@
         }
     });
 
-    // 3. Fungsi untuk mengirim data (tidak ada perubahan signifikan)
-    document.getElementById('penilaianForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      // ... (Kode submit form sama persis seperti jawaban sebelumnya)
+    // 3. Fungsi untuk mengirim data saat form di-submit
+    form.addEventListener('submit', function(e) {
+      e.preventDefault(); // Mencegah halaman reload
+
+      // Nonaktifkan tombol dan tampilkan status
+      submitButton.disabled = true;
+      statusDiv.textContent = 'Mengirim data...';
+      statusDiv.className = '';
+      statusDiv.style.display = 'block';
+
+      const formData = new FormData(form);
+
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.result === "success") {
+          statusDiv.textContent = 'Penilaian berhasil dikirim!';
+          statusDiv.className = 'success';
+          form.reset(); // Mengosongkan form setelah berhasil
+          // Reset dropdown murid
+          muridSelect.disabled = true;
+          muridSelect.innerHTML = '<option value="">Pilih kelas terlebih dahulu</option>';
+        } else {
+          // Jika ada error dari Google Script, tampilkan pesannya
+          throw new Error(data.error || 'Terjadi kesalahan yang tidak diketahui.');
+        }
+      })
+      .catch(error => {
+        console.error('Error submitting form:', error);
+        statusDiv.textContent = 'Gagal mengirim penilaian: ' + error.message;
+        statusDiv.className = 'error';
+      })
+      .finally(() => {
+        // Aktifkan kembali tombolnya setelah proses selesai (baik sukses maupun gagal)
+        submitButton.disabled = false;
+      });
     });
   </script>
 </body>
